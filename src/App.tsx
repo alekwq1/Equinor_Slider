@@ -11,7 +11,7 @@ const degToRad = (deg: number) => (deg * Math.PI) / 180;
 
 const splatFiles = [
   {
-    label: "04.06.2025",
+    label: "04.06.2024",
     url: "/models/Equinor_04_06_2024.splat",
     position: new THREE.Vector3(96.9, 54.9, 0.5),
     rotation: new THREE.Euler(degToRad(0), degToRad(-101), degToRad(1)),

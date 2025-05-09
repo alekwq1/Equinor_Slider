@@ -38,6 +38,13 @@ const splatFiles = [
     rotation: new THREE.Euler(0, 0, 0),
     scale: new THREE.Vector3(1, 1, 1),
   },
+  {
+    label: "08.05.2025",
+    url: "/models/Equinor_08_05_2025.splat",
+    position: new THREE.Vector3(-14.5, 0, -20.5),
+    rotation: new THREE.Euler(0, degToRad(-24.5), 0),
+    scale: new THREE.Vector3(1, 1, 1),
+  },
 ];
 
 const infoPoints = [

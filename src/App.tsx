@@ -74,6 +74,7 @@ const infoPoints = [
 
 export default function App() {
   const [clipX, setClipX] = useState(2);
+  const [dpr, setDpr] = useState(1); // New state for DPR
   const [isLoading, setIsLoading] = useState(true);
   const [blobs, setBlobs] = useState<(string | null)[]>(
     splatFiles.map(() => null)
@@ -214,7 +215,7 @@ export default function App() {
       )}
 
       <Canvas
-        dpr={1}
+        dpr={dpr}
         camera={{ position: [40, 90, 210], fov: 40 }}
         gl={{
           antialias: false,
@@ -289,7 +290,22 @@ export default function App() {
             />
           ))}
       </Canvas>
-
+      {!isLoading && (
+        <div style={dprControlsStyle}>
+          <label style={{ color: "white", marginRight: "8px" }}>
+            DPR: {dpr.toFixed(1)}
+          </label>
+          <input
+            type="range"
+            min="0.1"
+            max="2"
+            step="0.1"
+            value={dpr}
+            onChange={(e) => setDpr(Number(e.target.value))}
+            style={{ width: "100px" }}
+          />
+        </div>
+      )}
       {!isLoading && (
         <div style={navStyle}>
           <select
@@ -671,7 +687,18 @@ const controlButtonStyle: React.CSSProperties = {
   width: "48px",
   height: "48px",
 };
-
+const dprControlsStyle: React.CSSProperties = {
+  position: "absolute",
+  top: 20,
+  right: 20,
+  display: "flex",
+  alignItems: "center",
+  background: "rgba(33, 140, 227, 0.42)",
+  borderRadius: "8px",
+  padding: "8px 16px",
+  zIndex: 10,
+  backdropFilter: "blur(5px)",
+};
 function LoadingOverlay() {
   return (
     <div

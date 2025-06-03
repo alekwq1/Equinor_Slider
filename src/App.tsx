@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { Canvas, extend, useFrame } from "@react-three/fiber";
 import { CameraControls, StatsGl, Html } from "@react-three/drei";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Splat } from "./lib/Splat";
 import { SplatMaterial } from "./lib/SplatMaterial";
 
@@ -9,6 +9,7 @@ extend({ SplatMaterial });
 
 const degToRad = (deg: number) => (deg * Math.PI) / 180;
 
+// Statyczne dane modeli, tworzone tylko raz
 const splatFiles = [
   {
     label: "04.06.2024",
@@ -54,6 +55,7 @@ const splatFiles = [
   },
 ];
 
+// Statyczne dane punktów informacyjnych
 const infoPoints = [
   {
     id: "biuro-budowy",
@@ -74,7 +76,7 @@ const infoPoints = [
 
 export default function App() {
   const [clipX, setClipX] = useState(2);
-  const [dpr, setDpr] = useState(1); // New state for DPR
+  const [dpr, setDpr] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [blobs, setBlobs] = useState<(string | null)[]>(
     splatFiles.map(() => null)
@@ -86,68 +88,66 @@ export default function App() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [activeInfoPoint, setActiveInfoPoint] = useState<string | null>(null);
   const controlsRef = useRef<CameraControls | null>(null);
+  const [showBackground, setShowBackground] = useState(true);
 
+  // Inicjalne ustawienie kamery
   useEffect(() => {
     if (controlsRef.current) {
       controlsRef.current.setLookAt(0, 150, 85, 10, 0, -10, true);
     }
   }, []);
 
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen();
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen();
-      setIsFullscreen(false);
-    }
-  };
+  // Obsługa klawiatury
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft") {
+        setClipX((prev) => Math.max(prev - 0.4, -2));
+      } else if (e.key === "ArrowRight") {
+        setClipX((prev) => Math.min(prev + 0.4, 2));
+      } else if (e.key === "r") {
+        resetCamera();
+      } else if (e.key === "f") {
+        toggleFullscreen();
+      } else if (e.key === "Escape" && activeInfoPoint) {
+        setActiveInfoPoint(null);
+      }
+    },
+    [activeInfoPoint]
+  );
 
-  const resetCamera = () => {
-    controlsRef.current?.setLookAt(0, 150, 85, 10, 0, -10, true);
-  };
+  useEffect(() => {
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleKeyDown]);
 
-  const handleFocusPoint = (position: THREE.Vector3) => {
-    if (controlsRef.current) {
-      const cameraPosition = new THREE.Vector3(
-        position.x - 10,
-        position.y + 120,
-        position.z + 80
-      );
-
-      controlsRef.current.setLookAt(
-        cameraPosition.x,
-        cameraPosition.y,
-        cameraPosition.z,
-        position.x,
-        position.y,
-        position.z,
-        true
-      );
-    }
-  };
-
+  // Obsługa zmiany fullscreen
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
     };
-
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     return () => {
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
     };
   }, []);
 
+  // Ładowanie pierwszego modelu i tła
   useEffect(() => {
-    const last = splatFiles.length - 1;
+    const lastIndex = splatFiles.length - 1;
+
     const loadInitial = async () => {
       try {
-        const res = await fetch(splatFiles[last].url);
+        const res = await fetch(splatFiles[lastIndex].url);
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
+
         setBlobs((prev) => {
+          // zwolnij poprzedni URL, jeśli istniał
+          if (prev[lastIndex]) {
+            URL.revokeObjectURL(prev[lastIndex]!);
+          }
           const next = [...prev];
-          next[last] = url;
+          next[lastIndex] = url;
           return next;
         });
       } catch (e) {
@@ -162,7 +162,13 @@ export default function App() {
         const res = await fetch("/models/Equinor_Back.splat");
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
-        setBackgroundBlob(url);
+
+        setBackgroundBlob((prev) => {
+          if (prev) {
+            URL.revokeObjectURL(prev);
+          }
+          return url;
+        });
       } catch (e) {
         console.error("Błąd ładowania tła:", e);
       }
@@ -172,12 +178,17 @@ export default function App() {
     loadBackground();
 
     return () => {
+      // Zwolnij wszystkie URL-e przy odmontowaniu komponentu
       blobs.forEach((url) => url && URL.revokeObjectURL(url));
-      backgroundBlob && URL.revokeObjectURL(backgroundBlob);
+      if (backgroundBlob) URL.revokeObjectURL(backgroundBlob);
     };
-  }, []);
+    // Nie dodajemy blobs i backgroundBlob jako zależności – zostawiamy tylko [].
+  }, []); // <-- pusta lista zależności
 
+  // Ładowanie pozostałych modeli tylko raz, po zakończeniu ładowania pierwszego
   useEffect(() => {
+    if (isLoading) return;
+
     const loadOthers = async () => {
       await Promise.all(
         splatFiles.map(async (file, i) => {
@@ -186,7 +197,11 @@ export default function App() {
             const res = await fetch(file.url);
             const blob = await res.blob();
             const url = URL.createObjectURL(blob);
+
             setBlobs((prev) => {
+              if (prev[i]) {
+                URL.revokeObjectURL(prev[i]!);
+              }
               const next = [...prev];
               next[i] = url;
               return next;
@@ -198,8 +213,47 @@ export default function App() {
       );
     };
 
-    !isLoading && loadOthers();
+    loadOthers();
+    // UWAGA: w zależnościach zostawiamy tylko [isLoading] – usuwamy blobs!
   }, [isLoading]);
+
+  // Funkcja do ustawienia kamery w domyślnej pozycji
+  const resetCamera = () => {
+    if (controlsRef.current) {
+      controlsRef.current.setLookAt(0, 150, 85, 10, 0, -10, true);
+    }
+  };
+
+  // Funkcja do przełączania fullscreen
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen();
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  };
+
+  // Funkcja do ustawienia kamery na wskazany punkt
+  const handleFocusPoint = (position: THREE.Vector3) => {
+    if (controlsRef.current) {
+      const cameraPosition = new THREE.Vector3(
+        position.x - 10,
+        position.y + 120,
+        position.z + 80
+      );
+      controlsRef.current.setLookAt(
+        cameraPosition.x,
+        cameraPosition.y,
+        cameraPosition.z,
+        position.x,
+        position.y,
+        position.z,
+        true
+      );
+    }
+  };
 
   return (
     <div style={{ position: "relative", width: "100vw", height: "100vh" }}>
@@ -212,6 +266,40 @@ export default function App() {
           onShow={() => setShowAllInfoPoints(false)}
           onHide={() => setShowAllInfoPoints(true)}
         />
+      )}
+
+      {!isLoading && (
+        <div style={topControlsStyle}>
+          <div style={dprControlsStyle}>
+            <label style={{ color: "white", marginRight: "8px" }}>
+              DPR: {dpr.toFixed(1)}
+            </label>
+            <input
+              type="range"
+              min="0.1"
+              max="2"
+              step="0.1"
+              value={dpr}
+              onChange={(e) => setDpr(Number(e.target.value))}
+              style={{ width: "100px" }}
+            />
+          </div>
+
+          <button
+            onClick={() => setShowBackground(!showBackground)}
+            style={{
+              ...controlButtonStyle,
+              background: showBackground
+                ? "rgba(33, 140, 227, 0.42)"
+                : "rgba(227, 33, 33, 0.42)",
+              marginLeft: "10px",
+            }}
+            title="Toggle background visibility"
+            aria-label={showBackground ? "Ukryj tło" : "Pokaż tło"}
+          >
+            {showBackground ? "🌆" : "🌆❌"}
+          </button>
+        </div>
       )}
 
       <Canvas
@@ -236,9 +324,8 @@ export default function App() {
         />
         <CameraLogger controlsRef={controlsRef} />
         <StatsGl />
-        <ScreenFog />
 
-        {backgroundBlob && (
+        {backgroundBlob && showBackground && (
           <Splat
             src={backgroundBlob}
             position={new THREE.Vector3(0, 0, 0)}
@@ -282,32 +369,17 @@ export default function App() {
               content={point.content}
               onFocus={handleFocusPoint}
               isActive={activeInfoPoint === point.id}
-              onToggle={() => {
+              onToggle={() =>
                 setActiveInfoPoint((prev) =>
                   prev === point.id ? null : point.id
-                );
-              }}
+                )
+              }
             />
           ))}
       </Canvas>
+
       {!isLoading && (
-        <div style={dprControlsStyle}>
-          <label style={{ color: "white", marginRight: "8px" }}>
-            DPR: {dpr.toFixed(1)}
-          </label>
-          <input
-            type="range"
-            min="0.1"
-            max="2"
-            step="0.1"
-            value={dpr}
-            onChange={(e) => setDpr(Number(e.target.value))}
-            style={{ width: "100px" }}
-          />
-        </div>
-      )}
-      {!isLoading && (
-        <div style={navStyle}>
+        <div style={bottomNavStyle}>
           <select
             value={leftIndex}
             onChange={(e) => setLeftIndex(Number(e.target.value))}
@@ -392,26 +464,7 @@ export default function App() {
   );
 }
 
-function ScreenFog() {
-  const ref = useRef<THREE.Mesh>(null);
-
-  useFrame(() => {
-    ref.current!.rotation.y += 0.0001;
-  });
-
-  return (
-    <mesh ref={ref} position={[0, 100, 0]} rotation={[degToRad(265), 0, 0]}>
-      <planeGeometry args={[150000, 150000]} />
-      <meshBasicMaterial
-        color="#dce2e8"
-        transparent
-        opacity={0.8}
-        depthWrite={true}
-      />
-    </mesh>
-  );
-}
-
+// Komponent InfoPoint
 function InfoPoint({
   position,
   label,
@@ -447,7 +500,6 @@ function InfoPoint({
     if (isActive) {
       document.addEventListener("click", handleClickOutside);
     }
-
     return () => {
       document.removeEventListener("click", handleClickOutside);
     };
@@ -523,6 +575,7 @@ function InfoPoint({
   );
 }
 
+// Komponent ButtonInfo
 function ButtonInfo({
   leftLabel,
   rightLabel,
@@ -645,7 +698,67 @@ function ButtonInfo({
   );
 }
 
-const navStyle: React.CSSProperties = {
+// Komponent LoadingOverlay
+function LoadingOverlay() {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        background: "rgba(255,255,255,0.8)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 999,
+        fontSize: "1.5rem",
+        fontWeight: "bold",
+        color: "#2261c5",
+      }}
+    >
+      ⏳ Ładowanie modeli...
+    </div>
+  );
+}
+
+// Komponent CameraLogger (tylko do debugowania)
+function CameraLogger({
+  controlsRef,
+}: {
+  controlsRef: React.RefObject<CameraControls>;
+}) {
+  useFrame(() => {
+    if (controlsRef.current) {
+      const pos = controlsRef.current.camera.position;
+      console.log(
+        `📷 Kamera: x=${pos.x.toFixed(2)} y=${pos.y.toFixed(
+          2
+        )} z=${pos.z.toFixed(2)}`
+      );
+    }
+  });
+  return null;
+}
+
+// Style
+const topControlsStyle: React.CSSProperties = {
+  position: "absolute",
+  top: 20,
+  right: 20,
+  display: "flex",
+  alignItems: "center",
+  zIndex: 10,
+};
+
+const dprControlsStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  background: "rgba(33, 140, 227, 0.42)",
+  borderRadius: "8px",
+  padding: "8px 16px",
+  backdropFilter: "blur(5px)",
+};
+
+const bottomNavStyle: React.CSSProperties = {
   position: "absolute",
   bottom: 20,
   left: "50%",
@@ -687,53 +800,3 @@ const controlButtonStyle: React.CSSProperties = {
   width: "48px",
   height: "48px",
 };
-const dprControlsStyle: React.CSSProperties = {
-  position: "absolute",
-  top: 20,
-  right: 20,
-  display: "flex",
-  alignItems: "center",
-  background: "rgba(33, 140, 227, 0.42)",
-  borderRadius: "8px",
-  padding: "8px 16px",
-  zIndex: 10,
-  backdropFilter: "blur(5px)",
-};
-function LoadingOverlay() {
-  return (
-    <div
-      style={{
-        position: "absolute",
-        inset: 0,
-        background: "rgba(255,255,255,0.8)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 999,
-        fontSize: "1.5rem",
-        fontWeight: "bold",
-        color: "#2261c5",
-      }}
-    >
-      ⏳ Ładowanie modeli...
-    </div>
-  );
-}
-
-function CameraLogger({
-  controlsRef,
-}: {
-  controlsRef: React.RefObject<CameraControls>;
-}) {
-  useFrame(() => {
-    if (controlsRef.current) {
-      const pos = controlsRef.current.camera.position;
-      console.log(
-        `📷 Kamera: x=${pos.x.toFixed(2)} y=${pos.y.toFixed(
-          2
-        )} z=${pos.z.toFixed(2)}`
-      );
-    }
-  });
-  return null;
-}

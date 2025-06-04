@@ -94,29 +94,29 @@ const splatFiles = [
 
 const infoPoints = [
   {
-    id: "biuro-budowy",
+    id: "Construction Office",
 
     position: new THREE.Vector3(-40, 5, -65),
 
-    label: "Biuro Budowy",
+    label: "Construction Office",
 
     icon: "🏠",
 
-    content: `Godziny dostępności:ᅠᅠᅠᅠᅠᅠ ᅠᅠ     🕒Poniedziałek – Piątek: 7:00 – 17:00ᅠ
+    content: `Hours of availability:ᅠᅠᅠᅠᅠᅠ ᅠᅠ     🕒Monday – Friday: 7:00 – 17:00ᅠ
 
-🚫 Po godzinach dostęp wyłącznie dla osób upoważnionych.`,
+🚫 After hours access is for authorised persons only.`,
   },
 
   {
-    id: "glowna-droga",
+    id: "main-road",
 
     position: new THREE.Vector3(35, 5, -5),
 
-    label: "Magazyn",
+    label: "Warehouse",
 
     icon: "🏗️",
 
-    content: "Stan budowy: 10% ukończoności",
+    content: "Construction Status: X% Complete",
   },
 ];
 
@@ -458,7 +458,7 @@ export default function App() {
         <div style={topControlsStyle}>
           <div style={dprControlsStyle}>
             <label style={{ color: "white", marginRight: "8px" }}>
-              DPR: {dpr.toFixed(1)}
+              Quality: {dpr.toFixed(1)}
             </label>
 
             <input
@@ -901,7 +901,7 @@ function ButtonInfo({
         onMouseLeave={() => setIsHovered(false)}
         onClick={() => handleToggle(true)}
       >
-        ℹ️ Jak korzystać?
+        ℹ️ How to use?
       </div>
 
       {showInfo && (
@@ -947,13 +947,11 @@ function ButtonInfo({
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 style={{ marginTop: 0, color: "#2261c5" }}>
-              Instrukcja obsługi
-            </h2>
+            <h2 style={{ marginTop: 0, color: "#2261c5" }}>User manual</h2>
 
             <div style={{ lineHeight: 1.6 }}>
               <p>
-                <strong>Aktualne porównanie:</strong>
+                <strong>Current comparison:</strong>
                 <br />
                 🟥 {leftLabel}
                 <br />
@@ -961,18 +959,18 @@ function ButtonInfo({
               </p>
 
               <p>
-                <strong>Sterowanie:</strong>
+                <strong>Control:</strong>
 
                 <ul>
-                  <li>Lewy przycisk myszy - obracanie widoku</li>
+                  <li>Left mouse button - rotate view</li>
 
-                  <li>Prawy przycisk myszy - przesuwanie widoku</li>
+                  <li>Right mouse button - pan view</li>
 
-                  <li>Kółko myszy - zoom</li>
+                  <li>Mouse wheel - zoom</li>
 
-                  <li>Suwak - regulacja płaszczyzny porównania</li>
+                  <li>Slider - Adjusting the plane of comparison</li>
 
-                  <li>Kliknij znaczniki 🚩 by przejść do lokalizacji</li>
+                  <li>Click on the 🚩 tags to go to the location</li>
                 </ul>
               </p>
             </div>

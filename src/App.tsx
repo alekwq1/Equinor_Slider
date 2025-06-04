@@ -1,8 +1,13 @@
 import * as THREE from "three";
+
 import { Canvas, extend, useFrame } from "@react-three/fiber";
+
 import { CameraControls, StatsGl, Html } from "@react-three/drei";
+
 import { useEffect, useRef, useState, useCallback } from "react";
+
 import { Splat } from "./lib/Splat";
+
 import { SplatMaterial } from "./lib/SplatMaterial";
 
 extend({ SplatMaterial });
@@ -10,96 +15,172 @@ extend({ SplatMaterial });
 const degToRad = (deg: number) => (deg * Math.PI) / 180;
 
 // Statyczne dane modeli, tworzone tylko raz
+
 const splatFiles = [
   {
     label: "04.06.2024",
+
     url: "/models/Equinor_04_06_2024.splat",
+
     position: new THREE.Vector3(96.9, 54.9, 0.5),
+
     rotation: new THREE.Euler(degToRad(0), degToRad(-101), degToRad(1)),
+
     scale: new THREE.Vector3(1.34, 1.34, 1.34),
   },
+
   {
     label: "29.01.2025",
+
     url: "/models/Equinor_29_01_2025.splat",
+
     position: new THREE.Vector3(-12, 0, -25.4),
+
     rotation: new THREE.Euler(0, degToRad(-29.8), degToRad(-1.5)),
+
     scale: new THREE.Vector3(1, 1, 1),
   },
+
   {
     label: "03.02.2025",
+
     url: "/models/Equinor_03_02_2025.splat",
+
     position: new THREE.Vector3(-3.6, 1.5, -12.8),
+
     rotation: new THREE.Euler(0, degToRad(176), 0),
+
     scale: new THREE.Vector3(0.983, 0.983, 0.983),
   },
+
   {
     label: "28.04.2025",
+
     url: "/models/Equinor_28_04_2025.splat",
+
     position: new THREE.Vector3(0, 0, 0),
+
     rotation: new THREE.Euler(0, 0, 0),
+
     scale: new THREE.Vector3(1, 1, 1),
   },
+
   {
     label: "08.05.2025",
+
     url: "/models/Equinor_08_05_2025.splat",
+
     position: new THREE.Vector3(-14.5, 0, -20.5),
+
     rotation: new THREE.Euler(0, degToRad(-24.5), 0),
+
     scale: new THREE.Vector3(1, 1, 1),
   },
+
   {
     label: "02.06.2025",
+
     url: "/models/Equinor_02_06_2025.splat",
+
     position: new THREE.Vector3(8.2, 2, -12),
+
     rotation: new THREE.Euler(degToRad(4), degToRad(-76.2), degToRad(5)),
+
     scale: new THREE.Vector3(1, 1, 1),
   },
 ];
 
 // Statyczne dane punktów informacyjnych
+
 const infoPoints = [
   {
     id: "biuro-budowy",
+
     position: new THREE.Vector3(-40, 5, -65),
+
     label: "Biuro Budowy",
+
     icon: "🏠",
+
     content: `Godziny dostępności:ᅠᅠᅠᅠᅠᅠ ᅠᅠ     🕒Poniedziałek – Piątek: 7:00 – 17:00ᅠ
+
 🚫 Po godzinach dostęp wyłącznie dla osób upoważnionych.`,
   },
+
   {
     id: "glowna-droga",
+
     position: new THREE.Vector3(35, 5, -5),
+
     label: "Magazyn",
+
     icon: "🏗️",
+
     content: "Stan budowy: 10% ukończoności",
   },
 ];
 
+const PASSWORD = "12345678"; // Hasło dostępu
+
 export default function App() {
+  // Dodane stany uwierzytelnienia
+
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  const [passwordInput, setPasswordInput] = useState("");
+
+  const [loginError, setLoginError] = useState(false);
+
   const [clipX, setClipX] = useState(2);
+
   const [dpr, setDpr] = useState(1);
+
   const [isLoading, setIsLoading] = useState(true);
+
   const [blobs, setBlobs] = useState<(string | null)[]>(
     splatFiles.map(() => null)
   );
+
   const [backgroundBlob, setBackgroundBlob] = useState<string | null>(null);
+
   const [leftIndex, setLeftIndex] = useState(splatFiles.length - 2);
+
   const [rightIndex, setRightIndex] = useState(splatFiles.length - 1);
+
   const [showAllInfoPoints, setShowAllInfoPoints] = useState(true);
+
   const [isFullscreen, setIsFullscreen] = useState(false);
+
   const [activeInfoPoint, setActiveInfoPoint] = useState<string | null>(null);
+
   const controlsRef = useRef<CameraControls | null>(null);
+
   const [showBackground, setShowBackground] = useState(true);
 
-  // Inicjalne ustawienie kamery
+  // Sprawdzanie zapisanego uwierzytelnienia przy ładowaniu
+
   useEffect(() => {
-    if (controlsRef.current) {
-      controlsRef.current.setLookAt(0, 150, 85, 10, 0, -10, true);
+    const savedAuth = localStorage.getItem("isAuthenticated");
+
+    if (savedAuth === "true") {
+      setIsAuthenticated(true);
     }
   }, []);
 
+  // Inicjalne ustawienie kamery
+
+  useEffect(() => {
+    if (controlsRef.current && isAuthenticated) {
+      controlsRef.current.setLookAt(0, 150, 85, 10, 0, -10, true);
+    }
+  }, [isAuthenticated]);
+
   // Obsługa klawiatury
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
+      if (!isAuthenticated) return;
+
       if (e.key === "ArrowLeft") {
         setClipX((prev) => Math.max(prev - 0.4, -2));
       } else if (e.key === "ArrowRight") {
@@ -112,42 +193,56 @@ export default function App() {
         setActiveInfoPoint(null);
       }
     },
-    [activeInfoPoint]
+
+    [isAuthenticated, activeInfoPoint]
   );
 
   useEffect(() => {
     window.addEventListener("keydown", handleKeyDown);
+
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
 
   // Obsługa zmiany fullscreen
+
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
     };
+
     document.addEventListener("fullscreenchange", handleFullscreenChange);
+
     return () => {
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
     };
   }, []);
 
   // Ładowanie pierwszego modelu i tła
+
   useEffect(() => {
+    if (!isAuthenticated) return;
+
     const lastIndex = splatFiles.length - 1;
 
     const loadInitial = async () => {
       try {
         const res = await fetch(splatFiles[lastIndex].url);
+
         const blob = await res.blob();
+
         const url = URL.createObjectURL(blob);
 
         setBlobs((prev) => {
           // zwolnij poprzedni URL, jeśli istniał
+
           if (prev[lastIndex]) {
             URL.revokeObjectURL(prev[lastIndex]!);
           }
+
           const next = [...prev];
+
           next[lastIndex] = url;
+
           return next;
         });
       } catch (e) {
@@ -160,13 +255,16 @@ export default function App() {
     const loadBackground = async () => {
       try {
         const res = await fetch("/models/Equinor_Back.splat");
+
         const blob = await res.blob();
+
         const url = URL.createObjectURL(blob);
 
         setBackgroundBlob((prev) => {
           if (prev) {
             URL.revokeObjectURL(prev);
           }
+
           return url;
         });
       } catch (e) {
@@ -175,35 +273,46 @@ export default function App() {
     };
 
     loadInitial();
+
     loadBackground();
 
     return () => {
       // Zwolnij wszystkie URL-e przy odmontowaniu komponentu
+
       blobs.forEach((url) => url && URL.revokeObjectURL(url));
+
       if (backgroundBlob) URL.revokeObjectURL(backgroundBlob);
     };
+
     // Nie dodajemy blobs i backgroundBlob jako zależności – zostawiamy tylko [].
-  }, []); // <-- pusta lista zależności
+  }, [isAuthenticated]); // <-- zależność od isAuthenticated
 
   // Ładowanie pozostałych modeli tylko raz, po zakończeniu ładowania pierwszego
+
   useEffect(() => {
-    if (isLoading) return;
+    if (!isAuthenticated || isLoading) return;
 
     const loadOthers = async () => {
       await Promise.all(
         splatFiles.map(async (file, i) => {
           if (blobs[i]) return;
+
           try {
             const res = await fetch(file.url);
+
             const blob = await res.blob();
+
             const url = URL.createObjectURL(blob);
 
             setBlobs((prev) => {
               if (prev[i]) {
                 URL.revokeObjectURL(prev[i]!);
               }
+
               const next = [...prev];
+
               next[i] = url;
+
               return next;
             });
           } catch (e) {
@@ -214,10 +323,12 @@ export default function App() {
     };
 
     loadOthers();
+
     // UWAGA: w zależnościach zostawiamy tylko [isLoading] – usuwamy blobs!
-  }, [isLoading]);
+  }, [isAuthenticated, isLoading]);
 
   // Funkcja do ustawienia kamery w domyślnej pozycji
+
   const resetCamera = () => {
     if (controlsRef.current) {
       controlsRef.current.setLookAt(0, 150, 85, 10, 0, -10, true);
@@ -225,35 +336,110 @@ export default function App() {
   };
 
   // Funkcja do przełączania fullscreen
+
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen();
+
       setIsFullscreen(true);
     } else {
       document.exitFullscreen();
+
       setIsFullscreen(false);
     }
   };
 
   // Funkcja do ustawienia kamery na wskazany punkt
+
   const handleFocusPoint = (position: THREE.Vector3) => {
     if (controlsRef.current) {
       const cameraPosition = new THREE.Vector3(
         position.x - 10,
+
         position.y + 120,
+
         position.z + 80
       );
+
       controlsRef.current.setLookAt(
         cameraPosition.x,
+
         cameraPosition.y,
+
         cameraPosition.z,
+
         position.x,
+
         position.y,
+
         position.z,
+
         true
       );
     }
   };
+
+  // Funkcja logowania
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (passwordInput === PASSWORD) {
+      setIsAuthenticated(true);
+
+      setLoginError(false);
+
+      localStorage.setItem("isAuthenticated", "true");
+    } else {
+      setLoginError(true);
+    }
+  };
+
+  if (!isAuthenticated) {
+    return (
+      <div style={loginContainerStyle}>
+        <form onSubmit={handleLogin} style={loginFormStyle}>
+          <h2 style={{ marginTop: 0, color: "#2261c5" }}>Access to the page</h2>
+
+          <label style={{ marginBottom: "10px", fontWeight: "bold" }}>
+            Enter password:
+          </label>
+
+          <input
+            type="password"
+            value={passwordInput}
+            onChange={(e) => setPasswordInput(e.target.value)}
+            style={{
+              padding: "10px",
+
+              fontSize: "16px",
+
+              border: loginError ? "2px solid red" : "1px solid #ccc",
+
+              borderRadius: "4px",
+
+              marginBottom: "15px",
+
+              width: "100%",
+
+              boxSizing: "border-box",
+            }}
+            autoFocus
+          />
+
+          <button type="submit" style={loginButtonStyle}>
+            Log in
+          </button>
+
+          {loginError && (
+            <p style={{ color: "red", marginTop: "15px", fontWeight: "bold" }}>
+              Access denied
+            </p>
+          )}
+        </form>
+      </div>
+    );
+  }
 
   return (
     <div style={{ position: "relative", width: "100vw", height: "100vh" }}>
@@ -274,6 +460,7 @@ export default function App() {
             <label style={{ color: "white", marginRight: "8px" }}>
               DPR: {dpr.toFixed(1)}
             </label>
+
             <input
               type="range"
               min="0.1"
@@ -289,9 +476,11 @@ export default function App() {
             onClick={() => setShowBackground(!showBackground)}
             style={{
               ...controlButtonStyle,
+
               background: showBackground
                 ? "rgba(33, 140, 227, 0.42)"
                 : "rgba(227, 33, 33, 0.42)",
+
               marginLeft: "10px",
             }}
             title="Toggle background visibility"
@@ -307,7 +496,9 @@ export default function App() {
         camera={{ position: [40, 90, 210], fov: 40 }}
         gl={{
           antialias: false,
+
           powerPreference: "high-performance",
+
           alpha: false,
         }}
       >
@@ -316,13 +507,15 @@ export default function App() {
         <CameraControls
           ref={controlsRef}
           makeDefault
-          minDistance={110}
+          minDistance={90}
           maxDistance={500}
           minPolarAngle={Math.PI / 90}
           maxPolarAngle={Math.PI / 2.5}
           dollySpeed={0.2}
         />
+
         <CameraLogger controlsRef={controlsRef} />
+
         <StatsGl />
 
         {backgroundBlob && showBackground && (
@@ -346,6 +539,7 @@ export default function App() {
               rotation={splatFiles[leftIndex].rotation}
               scale={splatFiles[leftIndex].scale}
             />
+
             <Splat
               src={blobs[rightIndex]!}
               clipX={clipX}
@@ -385,12 +579,19 @@ export default function App() {
             onChange={(e) => setLeftIndex(Number(e.target.value))}
             style={{
               background: "#ffebee",
+
               border: "2px solid #d32f2f",
+
               borderRadius: "8px",
+
               padding: "8px 12px",
+
               color: "#b71c1c",
+
               fontWeight: "bold",
+
               cursor: "pointer",
+
               marginRight: "10px",
             }}
           >
@@ -426,12 +627,19 @@ export default function App() {
             onChange={(e) => setRightIndex(Number(e.target.value))}
             style={{
               background: "#e3f2fd",
+
               border: "2px solid #2196f3",
+
               borderRadius: "8px",
+
               padding: "8px 12px",
+
               color: "#0d47a1",
+
               fontWeight: "bold",
+
               cursor: "pointer",
+
               marginLeft: "10px",
             }}
           >
@@ -455,6 +663,7 @@ export default function App() {
           <button style={controlButtonStyle} onClick={toggleFullscreen}>
             {isFullscreen ? "⤡" : "⤢"}
           </button>
+
           <button style={controlButtonStyle} onClick={resetCamera}>
             🎥
           </button>
@@ -465,24 +674,38 @@ export default function App() {
 }
 
 // Komponent InfoPoint
+
 function InfoPoint({
   position,
+
   label,
+
   content,
+
   icon = "🚩",
+
   onFocus,
+
   isActive,
+
   onToggle,
 }: {
   position: THREE.Vector3;
+
   label: string;
+
   content: string;
+
   icon?: string;
+
   onFocus?: (position: THREE.Vector3) => void;
+
   isActive: boolean;
+
   onToggle: () => void;
 }) {
   const markerRef = useRef<HTMLDivElement>(null);
+
   const infoRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -500,6 +723,7 @@ function InfoPoint({
     if (isActive) {
       document.addEventListener("click", handleClickOutside);
     }
+
     return () => {
       document.removeEventListener("click", handleClickOutside);
     };
@@ -511,59 +735,92 @@ function InfoPoint({
         ref={markerRef}
         style={{
           background: "rgba(33, 140, 227, 0.9)",
+
           borderRadius: "50%",
+
           width: "32px",
+
           height: "32px",
+
           display: "flex",
+
           alignItems: "center",
+
           justifyContent: "center",
+
           cursor: "pointer",
+
           color: "white",
+
           fontSize: "24px",
+
           transition: "all 0.2s",
+
           transform: isActive ? "scale(1.2)" : "scale(1)",
         }}
         onClick={(e) => {
           e.stopPropagation();
+
           onToggle();
+
           onFocus?.(position);
         }}
       >
         {icon}
       </div>
+
       {isActive && (
         <div
           ref={infoRef}
           style={{
             position: "absolute",
+
             bottom: "40px",
+
             left: "50%",
+
             transform: "translateX(-50%)",
+
             background: "white",
+
             padding: "1.5rem",
+
             borderRadius: "12px",
+
             boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+
             width: "320px",
+
             zIndex: 1000,
           }}
         >
           <h3 style={{ margin: "0 0 1rem 0", color: "#2261c5" }}>{label}</h3>
+
           <p style={{ margin: 0, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
             {content}
           </p>
+
           <button
             style={{
               position: "absolute",
+
               top: "0.5rem",
+
               right: "0.5rem",
+
               background: "none",
+
               border: "none",
+
               cursor: "pointer",
+
               fontSize: "1.2rem",
+
               color: "#666",
             }}
             onClick={(e) => {
               e.stopPropagation();
+
               onToggle();
             }}
           >
@@ -576,23 +833,33 @@ function InfoPoint({
 }
 
 // Komponent ButtonInfo
+
 function ButtonInfo({
   leftLabel,
+
   rightLabel,
+
   onShow,
+
   onHide,
 }: {
   leftLabel: string;
+
   rightLabel: string;
+
   onShow: () => void;
+
   onHide: () => void;
 }) {
   const [showInfo, setShowInfo] = useState(false);
+
   const [isHovered, setIsHovered] = useState(false);
+
   const [isCloseHovered, setIsCloseHovered] = useState(false);
 
   const handleToggle = (show: boolean) => {
     setShowInfo(show);
+
     show ? onShow() : onHide();
   };
 
@@ -601,20 +868,33 @@ function ButtonInfo({
       <div
         style={{
           position: "absolute",
+
           bottom: 20,
+
           left: 20,
+
           zIndex: 1000,
+
           background: isHovered
             ? "rgba(33, 140, 227, 0.8)"
             : "rgba(33, 140, 227, 0.42)",
+
           borderRadius: "8px",
+
           padding: "8px 16px",
+
           cursor: "pointer",
+
           transition: "all 0.2s",
+
           color: "white",
+
           display: "flex",
+
           gap: "8px",
+
           alignItems: "center",
+
           transform: isHovered ? "scale(1.05)" : "scale(1)",
         }}
         onMouseEnter={() => setIsHovered(true)}
@@ -628,15 +908,25 @@ function ButtonInfo({
         <div
           style={{
             position: "fixed",
+
             top: 0,
+
             left: 0,
+
             right: 0,
+
             bottom: 0,
+
             backgroundColor: "rgba(0,0,0,0.5)",
+
             zIndex: 1001,
+
             display: "flex",
+
             alignItems: "center",
+
             justifyContent: "center",
+
             backdropFilter: "blur(2px)",
           }}
           onClick={() => handleToggle(false)}
@@ -644,10 +934,15 @@ function ButtonInfo({
           <div
             style={{
               background: "white",
+
               padding: "2rem",
+
               borderRadius: "12px",
+
               maxWidth: "500px",
+
               position: "relative",
+
               boxShadow: "0 8px 30px rgba(0,0,0,0.2)",
             }}
             onClick={(e) => e.stopPropagation()}
@@ -655,6 +950,7 @@ function ButtonInfo({
             <h2 style={{ marginTop: 0, color: "#2261c5" }}>
               Instrukcja obsługi
             </h2>
+
             <div style={{ lineHeight: 1.6 }}>
               <p>
                 <strong>Aktualne porównanie:</strong>
@@ -663,26 +959,40 @@ function ButtonInfo({
                 <br />
                 🟦 {rightLabel}
               </p>
+
               <p>
                 <strong>Sterowanie:</strong>
+
                 <ul>
                   <li>Lewy przycisk myszy - obracanie widoku</li>
+
                   <li>Prawy przycisk myszy - przesuwanie widoku</li>
+
                   <li>Kółko myszy - zoom</li>
+
                   <li>Suwak - regulacja płaszczyzny porównania</li>
+
                   <li>Kliknij znaczniki 🚩 by przejść do lokalizacji</li>
                 </ul>
               </p>
             </div>
+
             <button
               style={{
                 position: "absolute",
+
                 top: "1rem",
+
                 right: "1rem",
+
                 background: "none",
+
                 border: "none",
+
                 fontSize: "1.5rem",
+
                 cursor: "pointer",
+
                 color: isCloseHovered ? "#2261c5" : "#666",
               }}
               onMouseEnter={() => setIsCloseHovered(true)}
@@ -699,19 +1009,29 @@ function ButtonInfo({
 }
 
 // Komponent LoadingOverlay
+
 function LoadingOverlay() {
   return (
     <div
       style={{
         position: "absolute",
+
         inset: 0,
+
         background: "rgba(255,255,255,0.8)",
+
         display: "flex",
+
         alignItems: "center",
+
         justifyContent: "center",
+
         zIndex: 999,
+
         fontSize: "1.5rem",
+
         fontWeight: "bold",
+
         color: "#2261c5",
       }}
     >
@@ -721,6 +1041,7 @@ function LoadingOverlay() {
 }
 
 // Komponent CameraLogger (tylko do debugowania)
+
 function CameraLogger({
   controlsRef,
 }: {
@@ -729,6 +1050,7 @@ function CameraLogger({
   useFrame(() => {
     if (controlsRef.current) {
       const pos = controlsRef.current.camera.position;
+
       console.log(
         `📷 Kamera: x=${pos.x.toFixed(2)} y=${pos.y.toFixed(
           2
@@ -736,67 +1058,172 @@ function CameraLogger({
       );
     }
   });
+
   return null;
 }
 
 // Style
+
+const loginContainerStyle: React.CSSProperties = {
+  position: "fixed",
+
+  top: 0,
+
+  left: 0,
+
+  width: "100vw",
+
+  height: "100vh",
+
+  display: "flex",
+
+  alignItems: "center",
+
+  justifyContent: "center",
+
+  backgroundColor: "rgba(255, 255, 255, 0.95)",
+
+  zIndex: 10000,
+};
+
+const loginFormStyle: React.CSSProperties = {
+  display: "flex",
+
+  flexDirection: "column",
+
+  background: "white",
+
+  padding: "2.5rem",
+
+  borderRadius: "12px",
+
+  boxShadow: "0 8px 30px rgba(0,0,0,0.15)",
+
+  maxWidth: "400px",
+
+  width: "90%",
+
+  textAlign: "center",
+};
+
+const loginButtonStyle: React.CSSProperties = {
+  padding: "12px 24px",
+
+  background: "#2190e3",
+
+  color: "white",
+
+  border: "none",
+
+  borderRadius: "8px",
+
+  cursor: "pointer",
+
+  fontSize: "16px",
+
+  fontWeight: "bold",
+
+  transition: "background 0.3s",
+};
+
 const topControlsStyle: React.CSSProperties = {
   position: "absolute",
+
   top: 20,
+
   right: 20,
+
   display: "flex",
+
   alignItems: "center",
+
   zIndex: 10,
 };
 
 const dprControlsStyle: React.CSSProperties = {
   display: "flex",
+
   alignItems: "center",
+
   background: "rgba(33, 140, 227, 0.42)",
+
   borderRadius: "8px",
+
   padding: "8px 16px",
+
   backdropFilter: "blur(5px)",
 };
 
 const bottomNavStyle: React.CSSProperties = {
   position: "absolute",
+
   bottom: 20,
+
   left: "50%",
+
   transform: "translateX(-50%)",
+
   display: "flex",
+
   alignItems: "center",
+
   justifyContent: "space-between",
+
   padding: "0.5rem 1rem",
+
   background: "rgba(33, 140, 227, 0.15)",
+
   borderRadius: "1rem",
+
   zIndex: 10,
+
   width: "90%",
+
   maxWidth: "500px",
+
   backdropFilter: "blur(5px)",
+
   boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
 };
 
 const controlsStyle: React.CSSProperties = {
   position: "absolute",
+
   bottom: 20,
+
   right: 20,
+
   display: "flex",
+
   gap: "1rem",
+
   zIndex: 10,
 };
 
 const controlButtonStyle: React.CSSProperties = {
   background: "rgba(33, 140, 227, 0.42)",
+
   border: "none",
+
   borderRadius: "8px",
+
   padding: "8px 16px",
+
   cursor: "pointer",
+
   color: "white",
+
   fontSize: "24px",
+
   transition: "all 0.2s",
+
   display: "flex",
+
   alignItems: "center",
+
   justifyContent: "center",
+
   width: "48px",
+
   height: "48px",
 };
